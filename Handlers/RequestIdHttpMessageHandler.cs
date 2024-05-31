@@ -1,3 +1,4 @@
+using Netcorext.Contracts;
 using Serilog.Context;
 
 namespace Netcorext.Extensions.AspNetCore.Handlers;
@@ -6,12 +7,14 @@ public class RequestIdHttpMessageHandler : DelegatingHandler
 {
     internal const string DEFAULT_HEADER_NAME = "X-Request-Id";
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IContextState _contextState;
     private readonly string _headerName;
     private readonly string[] _headerNames;
 
-    public RequestIdHttpMessageHandler(IHttpContextAccessor httpContextAccessor, string headerName, string[] headerNames)
+    public RequestIdHttpMessageHandler(IHttpContextAccessor httpContextAccessor, IContextState contextState, string headerName, string[] headerNames)
     {
         _httpContextAccessor = httpContextAccessor;
+        _contextState = contextState;
         _headerName = headerName;
         _headerNames = headerNames.Length == 0
                            ? new[] { DEFAULT_HEADER_NAME }
@@ -23,10 +26,7 @@ public class RequestIdHttpMessageHandler : DelegatingHandler
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        if (_httpContextAccessor.HttpContext == null)
-            return base.Send(request, cancellationToken);
-
-        SetRequestId(_httpContextAccessor.HttpContext, request, _headerName, _headerNames);
+        SetRequestId(_contextState, _httpContextAccessor.HttpContext, request, _headerName, _headerNames);
 
         return base.Send(request, cancellationToken);
     }
@@ -36,30 +36,30 @@ public class RequestIdHttpMessageHandler : DelegatingHandler
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        if (_httpContextAccessor.HttpContext == null)
-            return await base.SendAsync(request, cancellationToken);
-
-        SetRequestId(_httpContextAccessor.HttpContext, request, _headerName, _headerNames);
+        SetRequestId(_contextState, _httpContextAccessor.HttpContext, request, _headerName, _headerNames);
 
         return await base.SendAsync(request, cancellationToken);
     }
 
-    private void SetRequestId(HttpContext context, HttpRequestMessage request, string headerName, params string[] headerNames)
+    private void SetRequestId(IContextState contextState, HttpContext? context,  HttpRequestMessage request, string headerName, params string[] headerNames)
     {
-        var requestId = string.Empty;
+        var requestId = contextState.RequestId;
 
-        foreach (var name in headerNames)
+        if (context != null)
         {
-            if (!context.Request.Headers.ContainsKey(name) || string.IsNullOrWhiteSpace(context.Request.Headers[name]))
-                continue;
+            foreach (var name in headerNames)
+            {
+                if (!context.Request.Headers.ContainsKey(name) || string.IsNullOrWhiteSpace(context.Request.Headers[name]))
+                    continue;
 
-            requestId = context.Request.Headers[name];
+                requestId = context.Request.Headers[name];
 
-            break;
+                break;
+            }
         }
 
         if (string.IsNullOrWhiteSpace(requestId))
-            requestId = context.TraceIdentifier;
+            return;
 
         if (request.Headers.Contains(headerName))
             request.Headers.Remove(headerName);

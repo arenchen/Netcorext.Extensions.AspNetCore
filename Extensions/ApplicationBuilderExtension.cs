@@ -41,7 +41,6 @@ public static class ApplicationBuilderExtension
                            if (overwriteTraceIdentifier)
                                context.TraceIdentifier = requestId;
 
-                           context.Request.Headers[headerName] = requestId;
                            context.Response.Headers[headerName] = requestId;
 
                            LogContext.PushProperty("XRequestId", requestId);

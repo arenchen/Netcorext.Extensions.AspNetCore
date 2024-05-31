@@ -1,3 +1,4 @@
+using Netcorext.Contracts;
 using Netcorext.Extensions.AspNetCore.Handlers;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -19,8 +20,9 @@ public static class HttpClientBuilderExtension
         builder.AddHttpMessageHandler(provider =>
                                       {
                                           var httpContextAccessor = provider.GetRequiredService<IHttpContextAccessor>();
+                                          var contextState = provider.GetRequiredService<IContextState>();
 
-                                          return new RequestIdHttpMessageHandler(httpContextAccessor, headerName, headerNames);
+                                          return new RequestIdHttpMessageHandler(httpContextAccessor, contextState, headerName, headerNames);
                                       });
 
         return builder;
